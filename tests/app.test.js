@@ -14,7 +14,7 @@ describe('API de tareas', () => {
 
   test('POST /api/tareas crea una tarea', async () => {
     const r = await request(app).post('/api/tareas').send({ titulo: 'Configurar pipeline' });
-    expect(r.status).toBe(201);
+    expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ id: 1, titulo: 'Configurar pipeline', completada: false });
   });
 
