@@ -1,0 +1,98 @@
+# Pipeline CI/CD: se ejecuta en cada push y pull request hacia main.
+# Flujo: Lint -> Pruebas (con cobertura) -> Build Docker -> Deploy a GitHub Pages
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Si se hacen varios push seguidos, cancela la ejecución anterior de la misma rama.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Etapa 1: revisión estática (sintaxis)
+  lint:
+    name: 1. Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Revisión estática
+        run: npm run lint
+
+  # Etapa 2: pruebas unitarias + integración + cobertura
+  test:
+    name: 2. Pruebas y cobertura
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Pruebas unitarias
+        run: npm run test:unit -- --coverage=false
+      - name: Pruebas de integración
+        run: npm run test:integration -- --coverage=false
+      - name: Pruebas completas con cobertura (umbral mínimo)
+        run: npm test
+      - name: Guardar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-cobertura
+          path: coverage/
+          retention-days: 14
+
+  # Etapa 3: construir la imagen Docker (verifica que el Dockerfile funcione)
+  docker:
+    name: 3. Build Docker
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imagen
+        run: docker build -t plantilla-devops-itla:${{ github.sha }} .
+      - name: Probar el contenedor (health check)
+        run: |
+          docker run -d --name app -p 3000:3000 plantilla-devops-itla:${{ github.sha }}
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fs http://localhost:3000/health; then echo; exit 0; fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
+
+  # Etapa 4: despliegue del frontend estático (carpeta public/) a GitHub Pages
+  deploy-pages:
+    name: 4. Despliegue a GitHub Pages
+    needs: [test, docker]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4

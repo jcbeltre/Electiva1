@@ -1,0 +1,25 @@
+{
+  "name": "plantilla-devops-itla",
+  "version": "1.1.0",
+  "description": "Práctica 3 de Electiva 1: Introducción a DevOps (ITLA) - Pipeline CI/CD con GitHub Actions",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "jest --coverage",
+    "test:unit": "jest tests/app.test.js",
+    "test:integration": "jest tests/integration.test.js",
+    "lint": "node --check src/app.js && node --check src/server.js"
+  },
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "dependencies": { "express": "^4.21.2" },
+  "devDependencies": { "jest": "^29.7.0", "supertest": "^7.0.0" },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": ["src/**/*.js", "!src/server.js"],
+    "coverageReporters": ["text", "text-summary", "lcov"],
+    "coverageThreshold": {
+      "global": { "statements": 80, "lines": 80, "functions": 80, "branches": 70 }
+    }
+  }
+}
